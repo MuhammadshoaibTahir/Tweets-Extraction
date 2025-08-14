@@ -1,0 +1,126 @@
+import pandas as pd
+import os
+import time
+import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+# === CONFIG ===
+INPUT_FILE = r"file location"
+BATCH_SIZE = #size                    
+WAIT_SECONDS = #                   
+MAX_WORKERS = #
+
+# === Chrome Options ===
+def create_driver():
+    options = Options()
+    options.add_argument("--headless=new")  
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--log-level=3")
+    return webdriver.Chrome(options=options)
+
+# === Extract a single tweet ===
+def fetch_tweet_text(tweet_id):
+    driver = create_driver()
+    url = f"https://x.com/i/web/status/{tweet_id}"
+    tweet_text = ""
+    try:
+        driver.get(url)
+        elem = WebDriverWait(driver, WAIT_SECONDS).until(
+            EC.presence_of_element_located((By.XPATH, "//article//div[@data-testid='tweetText']"))
+        )
+        tweet_text = elem.text.strip()
+    except:
+        pass
+    driver.quit()
+    return tweet_id, tweet_text
+
+# === Main Script ===
+start_time = time.time()
+
+if not os.path.exists(INPUT_FILE):
+    print(f"❌ File not found: {INPUT_FILE}")
+    exit()
+
+df = pd.read_excel(INPUT_FILE, dtype=str)
+if "Tweet_ID" not in df.columns:
+    print("❌ 'Tweet id' column not found.")
+    exit()
+
+tweet_ids = (
+    df["Tweet_ID"]
+    .dropna()
+    .astype(str)
+    .str.strip()
+    .str.replace("/", "", regex=False)
+    .tolist()
+)
+
+print(f"📂 Found {len(tweet_ids)} tweet IDs.")
+
+output_dir = os.path.join(os.path.dirname(INPUT_FILE) or os.getcwd(), "BatchesOutput")
+os.makedirs(output_dir, exist_ok=True)
+base_name = os.path.splitext(os.path.basename(INPUT_FILE))[0]
+
+results = []
+no_text_results = []
+saved_files = []
+count_with_text = 0
+batch_counter = 0
+processed_ids = set()
+
+# === Run in Parallel ===
+with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    futures = {executor.submit(fetch_tweet_text, tid): tid for tid in tweet_ids}
+    for i, future in enumerate(as_completed(futures), 1):
+        try:
+            tid, text = future.result()
+            if text:
+                count_with_text += 1
+                results.append({"Tweet_ID": tid, "Tweet_Text": text})
+                processed_ids.add(tid)
+                print(f"✅ {count_with_text}: {text[:70]}...")
+            else:
+                no_text_results.append({"Tweet_ID": tid})
+                print(f"❌ {tid} → No text found")
+        except Exception as e:
+            print(f"⚠️ Error processing: {futures[future]} → {e}")
+            traceback.print_exc()
+
+        # Save in batches
+        if len(results) >= BATCH_SIZE:
+            batch_counter += 1
+            out_path = os.path.join(output_dir, f"{base_name}_batch{batch_counter}.xlsx")
+            pd.DataFrame(results).to_excel(out_path, index=False)
+            saved_files.append(out_path)
+            print(f"💾 Saved batch {batch_counter} ({len(results)}) → {out_path}")
+            results.clear()
+
+            # Remove processed IDs from original file
+            df = df[~df["Tweet_ID"].astype(str).isin(processed_ids)]
+            df.to_excel(INPUT_FILE, index=False)
+
+# Save any remaining tweets with text
+if results:
+    batch_counter += 1
+    out_path = os.path.join(output_dir, f"{base_name}_batch{batch_counter}.xlsx")
+    pd.DataFrame(results).to_excel(out_path, index=False)
+    saved_files.append(out_path)
+    print(f"💾 Saved final batch {batch_counter} ({len(results)}) → {out_path}")
+
+    # Remove processed IDs from original file
+    df = df[~df["Tweet_ID"].astype(str).isin(processed_ids)]
+    df.to_excel(INPUT_FILE, index=False)
+
+# Save tweets with no text
+if no_text_results:
+    no_text_path = os.path.join(output_dir, f"{base_name}_no_text.xlsx")
+    pd.DataFrame(no_text_results).to_excel(no_text_path, index=False)
+    print(f"📄 Saved {len(no_text_results)} tweets with NO text → {no_text_path}")
