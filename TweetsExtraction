@@ -1,13 +1,5 @@
 import pandas as pd
 import os
-import time
-import traceback
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 # === CONFIG ===
 INPUT_FILE = r"file location"
@@ -124,3 +116,314 @@ if no_text_results:
     no_text_path = os.path.join(output_dir, f"{base_name}_no_text.xlsx")
     pd.DataFrame(no_text_results).to_excel(no_text_path, index=False)
     print(f"📄 Saved {len(no_text_results)} tweets with NO text → {no_text_path}")
+
+# # # import pandas as pd
+# # # import time
+# # # from selenium import webdriver
+# # # from selenium.webdriver.common.by import By
+# # # from selenium.webdriver.chrome.options import Options
+
+# # # # === Load Excel file with Tweet IDs ===
+# # # df = pd.read_excel(r"E:\\Annotated Arabic Extremism Content.xlsx")
+# # # tweet_ids = df['Tweet_ID'].astype(str).tolist()
+
+# # # # === Setup Chrome options ===
+# # # options = Options()
+# # # options.add_argument("--headless")  # Run Chrome in headless mode
+# # # options.add_argument("--disable-gpu")
+# # # options.add_argument("--no-sandbox")
+# # # options.add_argument("--enable-unsafe-swiftshader")
+
+# # # # === Start WebDriver ===
+# # # try:
+# # #     driver = webdriver.Chrome(options=options)
+# # # except Exception as e:
+# # #     print("❌ Failed to start ChromeDriver:", e)
+# # #     exit()
+
+# # # # === Function to process tweet batches ===
+# # # def process_tweet_batch(batch, start_index, total_count):
+# # #     tweets = []
+# # #     for i, tweet_id in enumerate(batch, start=start_index + 1):
+# # #         url = f"https://x.com/i/web/status/{tweet_id}"
+# # #         driver.get(url)
+# # #         time.sleep(5)
+
+# # #         try:
+# # #             tweet_text = driver.find_element(By.XPATH, "//article//div[@data-testid='tweetText']").text
+# # #         except Exception:
+# # #             tweet_text = "Tweet not found or blocked"
+# # #             print(f"⚠️ ID: {tweet_id} → {tweet_text}")
+
+# # #         print(f"{i}/{total_count} | ID: {tweet_id} → {tweet_text}")
+# # #         tweets.append({'Tweet_ID': tweet_id, 'Tweet_Text': tweet_text})
+# # #     return tweets
+
+
+
+# # # import pandas as pd
+# # # import webbrowser
+# # # import time
+
+# # # # Corrected: Read Excel instead of CSV
+# # # df = pd.read_excel("E:\\Annotated Arabic Extremism Content.xlsx")
+
+# # # # Make sure 'Tweet_ID' column exists
+# # # tweet_ids = df["Tweet_ID"].dropna().astype(str).tolist()
+
+# # # batch_size = 10
+# # # delay_between_tabs = 0.2
+# # # total = len(tweet_ids)
+
+# # # print(f"Total Tweet IDs: {total}")
+
+# # # for i in range(0, total, batch_size):
+# # #     batch = tweet_ids[i:i+batch_size]
+# # #     print(f"\nOpening tweets {i+1} to {i+len(batch)}...")
+
+# # #     for tweet_id in batch:
+# # #         url = f"https://twitter.com/i/web/status/{tweet_id}"
+# # #         webbrowser.open_new_tab(url)
+# # #         time.sleep(delay_between_tabs)
+
+# # #     if i + batch_size < total:
+# # #         input(f"\n✅ Press Enter to open the next batch of {batch_size}...")
+# # #     else:
+# # #         print("\n🎉 All tweets opened.")
+
+
+# # #BEST WORKING 
+
+# import pandas as pd
+# import time
+# import os
+# from selenium import webdriver
+# from selenium.webdriver.common.by import By
+# from selenium.webdriver.chrome.options import Options
+# from selenium.webdriver.support.ui import WebDriverWait
+# from selenium.webdriver.support import expected_conditions as EC
+
+# input_files = [r"D:\\Arabic.xlsx"]
+
+# options = Options()
+# options.add_argument("--headless")
+# options.add_argument("--disable-gpu")
+# options.add_argument("--no-sandbox")
+
+# try:
+#     driver = webdriver.Chrome(options=options)
+# except Exception as e:
+#     print("❌ Failed to start ChromeDriver:", e)
+#     exit()
+
+# start_time = time.time()
+
+# for file_path in input_files:
+#     print(f"\n📂 Processing file: {file_path}")
+
+#     # Directory & base name for saving output
+#     input_dir = os.path.dirname(file_path)
+#     base_name = os.path.splitext(os.path.basename(file_path))[0]
+
+#     df = pd.read_excel(file_path)
+#     all_tweet_ids = df['Tweet_ID'].astype(str).tolist()
+
+#     output_path = os.path.join(input_dir, f"{base_name}_result.xlsx")
+
+#     # If file exists, load it to avoid duplicates
+#     if os.path.exists(output_path):
+#         collected_df = pd.read_excel(output_path)
+#         collected_ids = set(collected_df['Tweet_ID'].astype(str))
+#         print(f"🔄 Resuming... {len(collected_ids)} tweets already saved.")
+#     else:
+#         collected_df = pd.DataFrame(columns=['Tweet_ID', 'Tweet_Text'])
+#         collected_ids = set()
+
+#     for tweet_id in all_tweet_ids:
+#         if tweet_id in collected_ids:
+#             print(f"⏩ Skipped already saved ID: {tweet_id}")
+#             continue
+
+#         url = f"https://x.com/i/web/status/{tweet_id}"
+#         driver.get(url)
+
+#         try:
+#             tweet_text_element = WebDriverWait(driver, 3).until(
+#                 EC.presence_of_element_located((By.XPATH, "//article//div[@data-testid='tweetText']"))
+#             )
+#             tweet_text = tweet_text_element.text.strip()
+#         except:
+#             tweet_text = ""
+
+#         if tweet_text:
+#             new_row = pd.DataFrame([{'Tweet_ID': tweet_id, 'Tweet_Text': tweet_text}])
+#             collected_df = pd.concat([collected_df, new_row], ignore_index=True)
+#             collected_df.to_excel(output_path, index=False)  # Save instantly
+#             collected_ids.add(tweet_id)
+#             print(f"✅ Saved: ID {tweet_id} → {tweet_text[:50]}...")
+#         else:
+#             print(f"❌ ID {tweet_id} → No text found (skipped)")
+
+# driver.quit()
+# print(f"\n⏱️ Total time: {round(time.time() - start_time, 2)} seconds")
+
+
+# # # import pandas as pd
+# # # import time
+# # # from selenium import webdriver
+# # # from selenium.webdriver.common.by import By
+# # # from selenium.webdriver.chrome.options import Options
+
+# # # # === Load Excel file with Tweet IDs ===
+# # # df = pd.read_excel(r"E:\\Annotated Arabic Extremism Content.xlsx")  # Adjust path if needed
+# # # tweet_ids = df['Tweet_ID'].astype(str).tolist()  # Use all IDs, or slice [:1000] for limit
+
+# # # # === Setup Chrome options ===
+# # # options = Options()
+# # # options.add_argument("--headless")  # Run Chrome in headless mode
+# # # options.add_argument("--disable-gpu")
+# # # options.add_argument("--no-sandbox")
+# # # options.add_argument("--enable-unsafe-swiftshader")  # Fix fallback rendering
+
+# # # # === Start WebDriver ===
+# # # try:
+# # #     driver = webdriver.Chrome(options=options)
+# # # except Exception as e:
+# # #     print("❌ Failed to start ChromeDriver:", e)
+# # #     exit()
+
+# # # # === Initialize ===
+# # # tweets_data = []
+# # # start_time = time.time()
+# # # BATCH_SIZE = 200
+# # # total_ids = len(tweet_ids)
+
+# # # # === Loop through tweets ===
+# # # for i, tweet_id in enumerate(tweet_ids, 1):
+# # #     url = f"https://x.com/i/web/status/{tweet_id}"
+# # #     driver.get(url)
+# # #     time.sleep(10)  # Wait for tweet to load
+
+# # #     try:
+# # #         tweet_text = driver.find_element(By.XPATH, "//article//div[@data-testid='tweetText']").text
+# # #     except Exception:
+# # #         tweet_text = "Tweet not found or blocked"
+# # #         print(f"⚠️ ID: {tweet_id} → {tweet_text}")
+
+# # #     print(f"{i}/{total_ids} | ID: {tweet_id} → {tweet_text}")
+# # #     tweets_data.append({'Tweet_ID': tweet_id, 'Tweet_Text': tweet_text})
+
+# # #     # === Save every 100 tweets ===
+# # #     if i % BATCH_SIZE == 0 or i == total_ids:
+# # #         batch_num = i // BATCH_SIZE if i % BATCH_SIZE == 0 else (i // BATCH_SIZE) + 1
+# # #         output_df = pd.DataFrame(tweets_data)
+# # #         output_path = fr"D:\\Multimodal\\output_tweets_batch_{batch_num}.xlsx"
+# # #         output_df.to_excel(output_path, index=False, engine='openpyxl')
+# # #         print(f"💾 Batch {batch_num} saved to: {output_path}")
+# # #         tweets_data = []  # Reset for next batch
+
+# # # driver.quit()
+
+# # # print(f"\n✅ All tweets processed and saved in batches of {BATCH_SIZE}.")
+# # # print(f"⏱️ Total time: {round(time.time() - start_time, 2)} seconds")
+
+# # # # === Process in batches ===
+# # # BATCH_SIZE = 250
+# # # tweets_data = []
+# # # total_ids = len(tweet_ids)
+# # # start_time = time.time()
+
+# # # for start in range(0, total_ids, BATCH_SIZE):
+# # #     end = min(start + BATCH_SIZE, total_ids)
+# # #     batch = tweet_ids[start:end]
+    
+# # #     print(f"\n📦 Processing tweets {start+1} to {end} of {total_ids}...\n")
+# # #     tweets_data.extend(process_tweet_batch(batch, start, total_ids))
+
+# # #     if end < total_ids:
+# # #         input("⏸️ Press ENTER to continue to the next batch...\n")
+
+# # # driver.quit()
+
+# # # # === Save to CSV ===
+# # # output_df = pd.DataFrame(tweets_data)
+# # # output_path = r"D:\Multimodal\output_tweets.csv"
+# # # output_df.to_csv(output_path, index=False, encoding='utf-8-sig')
+
+# # # print(f"\n✅ Done! Tweets saved to: {output_path}")
+# # # print(f"⏱️ Total time: {round(time.time() - start_time, 2)} seconds")
+
+# # # import snscrape.modules.twitter as sntwitter
+# # # import pandas as pd
+
+# # # # -----------------------------
+# # # # 🔹 Function to fetch tweets
+# # # # -----------------------------
+# # # def fetch_tweets(username, hashtags, start_year, end_year, keywords):
+# # #     query_parts = []
+
+# # #     if username:
+# # #         query_parts.append(f"from:{username}")
+    
+# # #     if hashtags:
+# # #         for tag in hashtags:
+# # #             if not tag.startswith('#'):
+# # #                 tag = '#' + tag
+# # #             query_parts.append(tag)
+    
+# # #     if keywords:
+# # #         query_parts.extend(keywords)
+    
+# # #     # Add date range
+# # #     query_parts.append(f"since:{start_year}-01-01")
+# # #     query_parts.append(f"until:{end_year}-12-31")
+
+# # #     full_query = " ".join(query_parts)
+# # #     print(f"🔍 Query: {full_query}")
+
+# # #     tweets = []
+# # #     for tweet in sntwitter.TwitterSearchScraper(full_query).get_items():
+# # #         tweets.append({
+# # #             "Date": tweet.date,
+# # #             "Username": tweet.user.username,
+# # #             "Content": tweet.content,
+# # #             "Likes": tweet.likeCount,
+# # #             "Retweets": tweet.retweetCount,
+# # #             "URL": tweet.url
+# # #         })
+
+# # #         # Limit (remove for full scrape)
+# # #         if len(tweets) >= 100:
+# # #             break
+
+# # #     return pd.DataFrame(tweets)
+
+
+# # # # -----------------------------
+# # # # 🔹 User Inputs
+# # # # -----------------------------
+# # # print("🔎 Twitter Scraper for Hashtags, Keywords, Gender Topics")
+
+# # # username = input("Enter Twitter username (without @): ")
+# # # hashtags_input = input("Enter hashtags separated by commas (e.g., #Gender,#LGBTQ): ")
+# # # start_year = input("Enter start year (e.g., 2020): ")
+# # # end_year = input("Enter end year (e.g., 2025): ")
+# # # keyword_input = input("Enter gender-related keywords (comma-separated, optional): ")
+
+# # # # Parse inputs
+# # # hashtags = [tag.strip() for tag in hashtags_input.split(",") if tag.strip()]
+# # # keywords = [kw.strip() for kw in keyword_input.split(",") if kw.strip()]
+
+# # # # -----------------------------
+# # # # 🔹 Fetch and Show Tweets
+# # # # -----------------------------
+# # # df = fetch_tweets(username, hashtags, start_year, end_year, keywords)
+
+# # # if not df.empty:
+# # #     print("\n📄 Top Tweets Found:")
+# # #     print(df[["Date", "Username", "Content", "Likes", "Retweets"]])
+# # #     df.to_csv("filtered_tweets.csv", index=False, encoding='utf-8-sig')
+# # #     print("\n✅ Saved to 'filtered_tweets.csv'")
+# # # else:
+# # #     print("❌ No tweets found for given criteria.")
+
